@@ -115,7 +115,7 @@ namespace Approov
         *  or is awaiting user input. Since the initial token fetch is the most
         *  expensive the prefetch seems reasonable.
         */
-        public void Prefetch() {
+        public static void Prefetch() {
             lock (InitializerLock) {
                 if (ApproovSDKInitialized) {
                     _ = HandleTokenFetchAsync();
@@ -123,7 +123,7 @@ namespace Approov
             }
         }
 
-        private async Task HandleTokenFetchAsync()
+        private static async Task HandleTokenFetchAsync()
         {
             _ = await Task.Run(() => FetchToken("approov.io"));
         }

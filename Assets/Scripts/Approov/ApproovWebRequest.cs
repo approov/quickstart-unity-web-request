@@ -327,6 +327,23 @@ namespace Approov {
         }
 
         /**
+        * Sets the header that should be used for binding in Approov tokens. This is the header that
+        * will be used to bind the Approov token to the request. If this is not set then no binding
+        * will be performed. Note that the binding header must be set before the Approov SDK is
+        * initialized.
+        *
+        * @param header is the header to be used for binding in Approov tokens
+        */
+        public static void SetBindingHeader(string header)
+        {
+            lock (BindingHeaderLock)
+            {
+                BindingHeader = header;
+                Console.WriteLine(TAG + "SetBindingHeader " + header);
+            }
+        }
+
+        /**
         * Checks if the url matches one of the exclusion regexs defined in exclusionURLRegexs
         * @param   url is the URL for which the check is performed
         * @return  Bool true if url matches preset pattern in Dictionary
