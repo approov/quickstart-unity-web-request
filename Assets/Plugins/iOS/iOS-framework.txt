@@ -1,0 +1,2 @@
+This directory should contain the `Approov.framework` (note, this is the devide framework and not the xcframework) library that you can download using the `approov` command line tool.
+The command you can use is: `approov sdk -getLibrary Approov.framework`

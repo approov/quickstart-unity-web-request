@@ -1,0 +1,2 @@
+This directory should include the `approov-sdk.aar` file that you can download using the `approov` command line tool.
+The command you can use is: `approov sdk -getLibrary approov-sdk.aar`
