@@ -10,33 +10,7 @@ namespace Approov {
     public class ApproovWebRequest: UnityWebRequest {
         // The log tag
         public static readonly string TAG = "ApproovWebRequest ";
-        /* Approov token default header */
-        public static string ApproovTokenHeader = "Approov-Token";
-        /* Approov token custom prefix: any prefix to be added such as "Bearer " */
-        public static string ApproovTokenPrefix = "";
-        /* Lock object for the above string variables */
-        protected static readonly object HeaderAndPrefixLock = new object();
-        /* true if the connection should proceed on network failures and not add an Approov token */
-        protected static bool ProceedOnNetworkFail = false;
-        /* Lock object for the above boolean variable*/
-        protected static readonly object ProceedOnNetworkFailLock = new();
-        /* Any header to be used for binding in Approov tokens or null if not set */
-        protected static string BindingHeader = null;
-        /* Lock object */
-        protected static readonly object BindingHeaderLock = new();
-        /* map of headers that should have their values substituted for secure strings, mapped to their
-            required prefixes */
-        protected static Dictionary<string, string> SubstitutionHeaders = new Dictionary<string, string>();
-        /* Lock object for the above Set*/
-        protected static readonly object SubstitutionHeadersLock = new();
-        /* set of URL regexs that should be excluded from any Approov protection */
-        protected static HashSet<Regex> ExclusionURLRegexs = new HashSet<Regex>();
-        /* Lock object for the above Set*/
-        protected static readonly object ExclusionURLRegexsLock = new();
-        /*  Set of query parameters that may be substituted, specified by the key name */
-        protected static HashSet<string> SubstitutionQueryParams = new HashSet<string>();
-        /* Lock object for the above Set*/
-        protected static readonly object SubstitutionQueryParamsLock = new();
+    
         // Constructors: https://docs.unity3d.com/ScriptReference/Networking.UnityWebRequest-ctor.html
         public ApproovWebRequest() : base() {
             this.certificateHandler = new ApproovCertificateHandler(this);
@@ -124,256 +98,6 @@ namespace Approov {
         // MARK: Regexp/Query param methods
 
         /*
-        * Sets a flag indicating if the network interceptor should proceed anyway if it is
-        * not possible to obtain an Approov token due to a networking failure. If this is set
-        * then your backend API can receive calls without the expected Approov token header
-        * being added, or without header/query parameter substitutions being made. Note that
-        * this should be used with caution because it may allow a connection to be established
-        * before any dynamic pins have been received via Approov, thus potentially opening the channel to a MitM.
-        *
-        * @param proceed is true if Approov networking fails should allow continuation
-        */
-        public static void SetProceedOnNetworkFailure(bool proceed)
-        {
-            lock (ProceedOnNetworkFailLock)
-            {
-                ProceedOnNetworkFail = proceed;
-                Console.WriteLine(TAG + "SetProceedOnNetworkFailure " + proceed.ToString());
-            }
-        }
-
-        /*
-        * Gets a flag indicating if the network interceptor should proceed anyway if it is
-        * not possible to obtain an Approov token due to a networking failure. If this is set
-        * then your backend API can receive calls without the expected Approov token header
-        * being added, or without header/query parameter substitutions being made. Note that
-        * this should be used with caution because it may allow a connection to be established
-        * before any dynamic pins have been received via Approov, thus potentially opening the channel to a MitM.
-        *
-        * @return boolean true if Approov networking fails should allow continuation
-        */
-        public static bool GetProceedOnNetworkFailure()
-        {
-            lock (ProceedOnNetworkFailLock)
-            {
-                return ProceedOnNetworkFail;
-            }
-        }
-
-        /*  Sets the Approov Header and optional prefix. By default, those values are "Approov-Token"
-        *  for the header and the prefix is an empty string. If you wish to use "Authorization Bearer .."
-        *  for example, the header should be set to "Authorization " and the prefix to "Bearer"
-        *  
-        *  @param  header the header to use
-        *  @param  prefix optional prefix, can be an empty string if not needed
-        */
-        public static void SetTokenHeaderAndPrefix(string header, string prefix)
-        {
-            lock (HeaderAndPrefixLock)
-            {
-                if (header != null) ApproovTokenHeader = header;
-                if (prefix != null) ApproovTokenPrefix = prefix;
-                Console.WriteLine(TAG + "SetTokenHeaderAndPrefix header: " + header + " prefix: " + prefix);
-            }
-        }
-
-        /*
-        * Adds the name of a header which should be subject to secure strings substitution. This
-        * means that if the header is present then the value will be used as a key to look up a
-        * secure string value which will be substituted into the header value instead. This allows
-        * easy migration to the use of secure strings. A required prefix may be specified to deal
-        * with cases such as the use of "Bearer " prefixed before values in an authorization header.
-        *
-        * @param header is the header to be marked for substitution
-        * @param requiredPrefix is any required prefix to the value being substituted or nil if not required
-        */
-        public static void AddSubstitutionHeader(string header, string requiredPrefix)
-        {
-            if (ApproovService.IsSDKInitialized())
-            {
-                lock (SubstitutionHeadersLock)
-                {
-                    if (requiredPrefix == null)
-                    {
-                        SubstitutionHeaders.Add(header, "");
-                    }
-                    else
-                    {
-                        SubstitutionHeaders.Add(header, requiredPrefix);
-                    }
-                    Console.WriteLine(TAG + "AddSubstitutionHeader header: " + header + " requiredPrefix: " + requiredPrefix);
-                }
-            }
-        }
-
-        /*
-            * Removes a header previously added using addSubstitutionHeader.
-            *
-            * @param header is the header to be removed for substitution
-            */
-        public static void RemoveSubstitutionHeader(string header)
-        {
-            if (ApproovService.IsSDKInitialized())
-            {
-                lock (SubstitutionHeadersLock)
-                {
-                    if (SubstitutionHeaders.ContainsKey(header))
-                    {
-                        SubstitutionHeaders.Remove(header);
-                        Console.WriteLine(TAG + "RemoveSubstitutionHeader " + header);
-
-                    }
-                }
-            }
-        }
-
-        /**
-            * Adds a key name for a query parameter that should be subject to secure strings substitution.
-            * This means that if the query parameter is present in a URL then the value will be used as a
-            * key to look up a secure string value which will be substituted as the query parameter value
-            * instead. This allows easy migration to the use of secure strings.
-            *
-            * @param key is the query parameter key name to be added for substitution
-            */
-        public static void AddSubstitutionQueryParam(string key)
-        {
-            if (ApproovService.IsSDKInitialized())
-            {
-                lock (SubstitutionQueryParamsLock)
-                {
-                    SubstitutionQueryParams.Add(key);
-                    Console.WriteLine(TAG + "AddSubstitutionQueryParam " + key);
-                }
-            }
-        }
-
-        /**
-        * Removes a query parameter key name previously added using addSubstitutionQueryParam.
-        * @param key is the query parameter key name to be removed for substitution
-        */
-        public static void RemoveSubstitutionQueryParam(string key)
-        {
-            if (ApproovService.IsSDKInitialized())
-            {
-                lock (SubstitutionQueryParamsLock)
-                {
-                    if (SubstitutionQueryParams.Contains(key))
-                    {
-                        SubstitutionQueryParams.Remove(key);
-                        Console.WriteLine(TAG + "RemoveSubstitutionQueryParam " + key);
-                    }
-                }
-            }
-        }
-
-        /**
-        * Adds an exclusion URL regular expression. If a URL for a request matches this regular expression
-        * then it will not be subject to any Approov protection. Note that this facility must be used with
-        * EXTREME CAUTION due to the impact of dynamic pinning. Pinning may be applied to all domains added
-        * using Approov, and updates to the pins are received when an Approov fetch is performed. If you
-        * exclude some URLs on domains that are protected with Approov, then these will be protected with
-        * Approov pins but without a path to update the pins until a URL is used that is not excluded. Thus
-        * you are responsible for ensuring that there is always a possibility of calling a non-excluded
-        * URL, or you should make an explicit call to fetchToken if there are persistent pinning failures.
-        * Conversely, use of those option may allow a connection to be established before any dynamic pins
-        * have been received via Approov, thus potentially opening the channel to a MitM.
-        *
-        * @param urlRegex is the regular expression that will be compared against URLs to exclude them
-        * @throws ArgumentException if urlRegex is malformed
-        */
-        public static void AddExclusionURLRegex(string urlRegex)
-        {
-            if (ApproovService.IsSDKInitialized())
-            {
-                lock (ExclusionURLRegexsLock)
-                {
-                    if (urlRegex != null)
-                    {
-                        try {
-                            Regex reg = new Regex(urlRegex);
-                            ExclusionURLRegexs.Add(reg);
-                            Console.WriteLine(TAG + "AddExclusionURLRegex " + urlRegex);
-                        } catch (ArgumentException e) {
-                            Console.WriteLine(TAG + "AddExclusionURLRegex: " + e.Message);
-                        }
-                    }
-                }
-            }
-        }
-
-        /**
-        * Removes an exclusion URL regular expression previously added using addExclusionURLRegex.
-        * @param urlRegex is the regular expression that will be compared against URLs to exclude them
-        * @throws ArgumentException if urlRegex is malformed
-        */
-        public static void RemoveExclusionURLRegex(string urlRegex)
-        {
-            if (ApproovService.IsSDKInitialized())
-            {
-                lock (ExclusionURLRegexsLock)
-                {
-                    if (urlRegex != null)
-                    {
-                        try {
-                            Regex reg = new Regex(urlRegex);
-                            ExclusionURLRegexs.Remove(reg);
-                            Console.WriteLine(TAG + "RemoveExclusionURLRegex " + urlRegex);
-                        } catch (ArgumentException e) {
-                            Console.WriteLine(TAG + "RemoveExclusionURLRegex: " + e.Message);
-                        }
-                    }
-                }
-            }
-        }
-
-        /**
-        * Sets the header that should be used for binding in Approov tokens. This is the header that
-        * will be used to bind the Approov token to the request. If this is not set then no binding
-        * will be performed. Note that the binding header must be set before the Approov SDK is
-        * initialized.
-        *
-        * @param header is the header to be used for binding in Approov tokens
-        */
-        public static void SetBindingHeader(string header)
-        {
-            lock (BindingHeaderLock)
-            {
-                BindingHeader = header;
-                Console.WriteLine(TAG + "SetBindingHeader " + header);
-            }
-        }
-
-        /**
-        * Checks if the url matches one of the exclusion regexs defined in exclusionURLRegexs
-        * @param   url is the URL for which the check is performed
-        * @return  Bool true if url matches preset pattern in Dictionary
-        */
-        public static bool CheckURLIsExcluded(string url)
-        {
-            // obtain a copy of the exclusion URL regular expressions in a thread safe way
-            int elementCount;
-            Regex[] exclusionURLs;
-            lock (ExclusionURLRegexsLock)
-            {
-                elementCount = ExclusionURLRegexs.Count;
-                if (elementCount == 0) return false;
-                exclusionURLs = new Regex[elementCount];
-                ExclusionURLRegexs.CopyTo(exclusionURLs);
-            }
-
-            foreach (Regex pattern in exclusionURLs)
-            {
-                Match match = pattern.Match(url, 0, url.Length);
-                if (match.Length > 0)
-                {
-                    Console.WriteLine(TAG + "CheckURLIsExcluded match for " + url);
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        /*
         *  Adds Approov to the given request by adding the Approov token in a header. If a binding header has been specified
         *  then this should be available. If it is not currently possible to fetch an Approov token (typically due to no or
         *  poor network) then an NetworkingErrorException is thrown and a later retry should be made. Other failures will
@@ -396,31 +120,28 @@ namespace Approov {
             Uri uri = new Uri(urlWithBaseAddress);
             string hostname = uri.Host;
             // Check if the URL matches one of the exclusion regexs and just return if it does
-            if (CheckURLIsExcluded(hostname))
+            if (ApproovService.CheckURLIsExcluded(hostname))
             {
                 Console.WriteLine(TAG + "UpdateRequestHeadersWithApproov excluded url " + hostname);
                 return;
             }
-
+            string bindingHeader = ApproovService.GetBindingHeader();
             // Check if Bind Header is set to a non empty String
-            lock (BindingHeaderLock)
+            if (bindingHeader != null)
             {
-                if (BindingHeader != null)
+                if (this.GetRequestHeader(bindingHeader) != null)
                 {
-                    if (this.GetRequestHeader(BindingHeader) != null)
-                    {
-                        // Returns all header values for a specified header stored in the Headers collection.
-                        string headerValue = this.GetRequestHeader(BindingHeader);
-                        ApproovService.SetDataHashInToken(headerValue);
-                        // Log
-                        Console.WriteLine(TAG + "bindheader set: " + headerValue);
-                    }
-                    else
-                    {
-                        throw new ConfigurationFailureException(TAG + "Missing token binding header: " + BindingHeader);
-                    }
+                    // Returns all header values for a specified header stored in the Headers collection.
+                    string headerValue = this.GetRequestHeader(bindingHeader);
+                    ApproovService.SetDataHashInToken(headerValue);
+                    // Log
+                    Console.WriteLine(TAG + "bindheader set: " + headerValue);
                 }
-            }// lock
+                else
+                {
+                    throw new ConfigurationFailureException(TAG + "Missing token binding header: " + bindingHeader);
+                }
+            }
             
             // Invoke fetch token sync from the ApproovBridge since we need to get the result
             ApproovTokenFetchResult approovResult = ApproovBridge.FetchApproovTokenAndWait(hostname);
@@ -453,7 +174,7 @@ namespace Approov {
             if (aCurrentFetchStatus == ApproovTokenFetchStatus.Success)
             {
                 // we successfully obtained a token so add it to the header
-                this.SetRequestHeader(ApproovTokenHeader, ApproovTokenPrefix + approovResult.token);
+                this.SetRequestHeader(ApproovService.GetTokenHeader(), ApproovService.GetTokenPrefix() + approovResult.token);
             }
             else if ((aCurrentFetchStatus == ApproovTokenFetchStatus.NoNetwork) ||
                     (aCurrentFetchStatus == ApproovTokenFetchStatus.PoorNetwork) ||
@@ -462,7 +183,7 @@ namespace Approov {
                 /* We are unable to get the approov token due to network conditions so the request can
                 *  be retried by the user later
                 */
-                if (!ProceedOnNetworkFail)
+                if (!ApproovService.GetProceedOnNetworkFailure())
                 {
                     // Must not proceed with network request and inform user a retry is needed
                     throw new NetworkingErrorException(TAG + "Retry attempt needed. " + approovResult.loggableToken, true);
@@ -490,12 +211,8 @@ namespace Approov {
                 return;
             }
             /* We now have to deal with any substitution headers */
-            // Make a copy of original dictionary
-            Dictionary<string, string> originalSubstitutionHeaders;
-            lock (SubstitutionHeadersLock)
-            {
-                originalSubstitutionHeaders = new Dictionary<string, string>(SubstitutionHeaders);
-            }
+            // Get a copy of original dictionary
+            Dictionary<string, string> originalSubstitutionHeaders = ApproovService.GetSubstitutionHeaders();
             // Iterate over the copied dictionary
             foreach (KeyValuePair<string, string> entry in originalSubstitutionHeaders)
             {
@@ -550,7 +267,7 @@ namespace Approov {
                         *  We are unable to get the secure string due to network conditions, so - unless this is
                         *  overridden - we must not proceed. The request can be retried by the user later.
                         */
-                        if (!ProceedOnNetworkFail)
+                        if (!ApproovService.GetProceedOnNetworkFailure())
                         {
                             // We throw
                             throw new NetworkingErrorException(TAG + "Header substitution: network issue, retry needed");
@@ -566,12 +283,8 @@ namespace Approov {
 
             /* Finally, we deal with any query parameter substitutions, which may require further fetches but these
             * should be using cached results */
-            // Make a copy of original substitutionQuery set
-            HashSet<string> originalQueryParams;
-            lock (SubstitutionQueryParamsLock)
-            {
-                originalQueryParams = new HashSet<string>(SubstitutionQueryParams);
-            }
+            // Get a copy of original substitutionQuery set
+            HashSet<string> originalQueryParams = ApproovService.GetSubstitutionQueryParams();
             string urlString = urlWithBaseAddress;
             foreach (string entry in originalQueryParams)
             {
@@ -618,7 +331,7 @@ namespace Approov {
                         *  We are unable to get the secure string due to network conditions, so - unless this is
                         *  overridden - we must not proceed. The request can be retried by the user later.
                         */
-                        if (!ProceedOnNetworkFail)
+                        if (!ApproovService.GetProceedOnNetworkFailure())
                         {
                             // We throw
                             throw new NetworkingErrorException(TAG + "Query parameter substitution: network issue, retry needed");

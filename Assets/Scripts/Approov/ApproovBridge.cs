@@ -149,7 +149,7 @@ namespace Approov {
         }
         
         // + (nonnull ApproovTokenFetchResult *)fetchApproovTokenAndWait:(nonnull NSString *)url;
-        [DllImport("__Internal")] // TODO: implement with JSON
+        [DllImport("__Internal")]
         private static extern IntPtr Approov_fetchApproovTokenAndWait(string url);
         
         // Define a method to call the native function
@@ -272,7 +272,7 @@ namespace Approov {
         }
 
         // + (nullable NSData *)getIntegrityMeasurementProof:(nonnull NSData *)nonce :(nonnull NSData *)measurementConfig;
-        [DllImport("__Internal")]// TODO: implement with byte[] in mm file
+        [DllImport("__Internal")]
         private static extern IntPtr Approov_getIntegrityMeasurementProof(byte[] nonce, int nonceLength, byte[] measurementConfig, int measurementConfigLength);
 
         public static byte[] GetIntegrityMeasurementProof(byte[] nonce, byte[] measurementConfig)
@@ -299,7 +299,7 @@ namespace Approov {
         }
 
         // + (nullable NSData *)getDeviceMeasurementProof:(nonnull NSData *)nonce :(nonnull NSData *)measurementConfig;
-        [DllImport("__Internal")] // TODO: implement with byte[] in mm file
+        [DllImport("__Internal")] 
         private static extern IntPtr Approov_getDeviceMeasurementProof(byte[] nonce, int nonceLength, byte[] measurementConfig, int measurementConfigLength);
 
         public static byte[] GetDeviceMeasurementProof(byte[] nonce, byte[] measurementConfig)
