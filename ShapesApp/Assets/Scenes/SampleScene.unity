@@ -135,7 +135,7 @@ GameObject:
   - component: {fileID: 172951548}
   - component: {fileID: 172951547}
   m_Layer: 0
-  m_Name: ShapesImage
+  m_Name: shapesImage
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -211,7 +211,7 @@ GameObject:
   - component: {fileID: 313320374}
   - component: {fileID: 313320373}
   m_Layer: 0
-  m_Name: HelloButton
+  m_Name: helloButton
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -645,7 +645,7 @@ GameObject:
   - component: {fileID: 1239107362}
   - component: {fileID: 1239107361}
   m_Layer: 0
-  m_Name: ShapesButton
+  m_Name: shapesButton
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -833,7 +833,7 @@ GameObject:
   - component: {fileID: 1541585295}
   - component: {fileID: 1541585294}
   m_Layer: 0
-  m_Name: StatusText
+  m_Name: statusText
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -885,7 +885,7 @@ MonoBehaviour:
     m_BestFit: 0
     m_MinSize: 1
     m_MaxSize: 40
-    m_Alignment: 0
+    m_Alignment: 4
     m_AlignByGeometry: 0
     m_RichText: 1
     m_HorizontalOverflow: 0
