@@ -17,7 +17,7 @@ public class ShapesApp : MonoBehaviour
     public Text statusText;
     // The image UI control to display the image
     public Image shapesImage;
-    // The API endpoint version: v1 unprotected, v3 protected
+    // The API endpoint version: v1 unprotected (Api-Key header is required), v2 (Api-Key header protected)  and v3 protected by Approov token
     static readonly string apiVersion = "v1";
     // The hello endpoint
     public static readonly string helloUrl = "https://shapes.approov.io/" + apiVersion + "/hello/";
