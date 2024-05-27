@@ -20,10 +20,12 @@ public class ShapesApp : MonoBehaviour
     // The API endpoint version: v1 unprotected, v3 protected
     static readonly string apiVersion = "v1";
     // The hello endpoint
-    public string helloUrl = "https://shapes.approov.io/" + apiVersion + "/hello/";
-    public string shapesUrl = "https://shapes.approov.io/" + apiVersion + "/shape/";
+    public static readonly string helloUrl = "https://shapes.approov.io/" + apiVersion + "/hello/";
+    public static readonly string shapesUrl = "https://shapes.approov.io/" + apiVersion + "/shapes/";
     // The Dictionary holding image name to image data
     private Dictionary<string, Texture2D> images = new Dictionary<string, Texture2D>();
+    // The Api-Key for the Approov protected endpoint
+    public static readonly string ApiKey = "yXClypapWNHIifHUWmBIyPFAm";
     // Start is called before the first frame update
     void Start()
     {
@@ -74,6 +76,11 @@ public class ShapesApp : MonoBehaviour
         // COMMENT OUT if using Approov
         UnityWebRequest webRequest = UnityWebRequest.Get(uri);
         /////////////////////////////////////////////////////
+        // *** UNCOMMENT THE LINE BELOW FOR APPROOV USING SECRETS PROTECTION ***
+        //ApproovService.AddSubstitutionHeader("Api-Key", null);
+        /////////////////////////////////////////////////////
+        // Add the APi-Key header with the corresponding value
+        webRequest.SetRequestHeader("Api-Key", ApiKey);
         // Request and wait for the desired page.
         yield return webRequest.SendWebRequest();
 
