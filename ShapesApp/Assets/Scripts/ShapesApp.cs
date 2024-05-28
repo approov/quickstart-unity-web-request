@@ -79,7 +79,7 @@ public class ShapesApp : MonoBehaviour
         // *** UNCOMMENT THE LINE BELOW FOR APPROOV USING SECRETS PROTECTION ***
         //ApproovService.AddSubstitutionHeader("Api-Key", null);
         /////////////////////////////////////////////////////
-        // Add the APi-Key header with the corresponding value
+        // Add the Api-Key header with the corresponding value
         webRequest.SetRequestHeader("Api-Key", ApiKey);
         // Request and wait for the desired page.
         yield return webRequest.SendWebRequest();
