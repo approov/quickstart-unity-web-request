@@ -75,40 +75,49 @@ Tokens for this domain will be automatically signed with the specific secret for
 
 ## MODIFY THE APP TO USE APPROOV
 
-To use Approov all you have to do is comment out the code using `HttpClient` and uncomment the line following that code, which enables the custom `ApproovHttpClient` code. Find the following lines in `MainPage.xaml.cs` source file:
+To use Approov all you have to do is comment out the code using `UnityWebRequest` and uncomment the line following that code, which enables the custom `ApproovWebRequest` code. Find the following lines in `ShapesApp.cs` source file:
 
 ```C#
-/* COMMENT this line if using Approov */
-private static HttpClient httpClient;
-/* UNCOMMENT this line if using Approov */
-//private static ApproovHttpClient httpClient;
-public GetShapePlatform()
-{
-    /* Comment out the line to use Approov SDK */
-    httpClient = new HttpClient();
-    /* Uncomment the lines bellow to use Approov SDK */
-    //ApproovService.Initialize("<enter-your-config-string-here>");
-    //httpClient = ApproovService.CreateHttpClient();
+using Newtonsoft.Json;
+// UNCOMMENT if using Approov
+//using Approov;
+
+/////////////////////////////////////////////////////
+// UNCOMMENT if using Approov
+// ApproovService.Initialize("<enter-your-config-string-here>");
+/////////////////////////////////////////////////////
+
+/////////////////////////////////////////////////////
+// UNCOMMENT if using Approov
+// ApproovWebRequest webRequest = ApproovWebRequest.Get(uri);
+// COMMENT OUT if using Approov
+UnityWebRequest webRequest = UnityWebRequest.Get(uri);
+/////////////////////////////////////////////////////
 ```
+
 Change the commented out lines so the code becomes:
+
 ```C#
-/* COMMENT this line if using Approov */
-//private static HttpClient httpClient;
-/* UNCOMMENT this line if using Approov */
-private static ApproovHttpClient httpClient;
-public GetShapePlatform()
-{
-    /* Comment out the line to use Approov SDK */
-    //httpClient = new HttpClient();
-    /* Uncomment the lines bellow to use Approov SDK */
-    ApproovService.Initialize("<enter-your-config-string-here>");
-    httpClient = ApproovService.CreateHttpClient();
+// UNCOMMENT if using Approov
+using Approov;
+
+/////////////////////////////////////////////////////
+// UNCOMMENT if using Approov
+ApproovService.Initialize("<enter-your-config-string-here>");
+/////////////////////////////////////////////////////
+
+/////////////////////////////////////////////////////
+// UNCOMMENT if using Approov
+ApproovWebRequest webRequest = ApproovWebRequest.Get(uri);
+// COMMENT OUT if using Approov
+//UnityWebRequest webRequest = UnityWebRequest.Get(uri);
+/////////////////////////////////////////////////////
 ```
 
 The Approov SDK needs a configuration string to identify the account associated with the app. It will have been provided in the Approov onboarding email (it will be something like `#123456#K/XPlLtfcwnWkzv99Wj5VmAxo4CrU267J1KlQyoz8Qo=`). Copy this string replacing the text `<enter-your-config-string-here>`.
 
-You will also need to uncomment the `using Approov;` directive to the top of the `MainPage.xaml.cs` source file.
-The `ApproovHttpClient` class adds the `Approov-Token` header and also applies pinning for the connections to ensure that no Man-in-the-Middle can eavesdrop on any communication being made. 
+You will also need to uncomment the `using Approov;` directive to the top of the `ShapesApp.cs` source file.
+The `ApproovWebRequest` class adds the `Approov-Token` header and also applies pinning for the connections to ensure that no Man-in-the-Middle can eavesdrop on any communication being made. 
 
 Finally, please, change the url to point to the Approov protected endpoint:
 
@@ -158,23 +167,12 @@ If it is not possible to download the correct certificate from the portal then i
 
 ## RUNNING THE SHAPES APP WITH APPROOV
 
-Make sure you have selected the correct build mode (Release) and target device (Generic Device) settings. 
-
-![Target Device](readme-images/target-device.png)
-
-Select the `Build` menu and then `Publish`. Once the archive file is ready you can either `Ad Hoc`, `Enterprise` or `Play Store` depending on the platform, sign it and save it to disk.
-
-![Build IPA Result](readme-images/build-ipa-result.png)
-
-Install the `ApproovShapes.ipa` or `.apk` file on the device. You will need to remove the old app from the device first.
+Build the `.apk` file ore generate the `Xcode` project and then build an `.ipa` file. Install the generated `ApproovShapes.ipa` or `.apk` file on the device. You will need to remove the old app from the device first.
 If using a recent Mac OS Version (greater than Catalina) and targeting iOS, simply drag the `ipa` file to the device. Alternatively, using `Xcode` you can select `Window`, then `Devices and Simulators` and after selecting your device click on the small `+` sign to locate the `ipa` archive you would like to install. For Android you will need to use the command line tools provided by Google.
-
-![Install IPA Visual Studio](readme-images/install-ipa.png)
-
 Launch the app and press the `Shape` button. You should now see this (or another shape):
 
 <p>
-    <img src="readme-images/shapes-good.png" width="256" title="Shapes Good">
+    <img src="readme-images/shapes-verified.png" width="256" title="Shapes Verified">
 </p>
 
 This means that the app is getting a validly signed Approov token to present to the shapes endpoint.
@@ -188,6 +186,7 @@ If you still don't get a valid shape then there are some things you can try. Rem
 * Use `approov metrics` to see [Live Metrics](https://approov.io/docs/latest/approov-usage-documentation/#metrics-graphs) of the cause of failure.
 * You can use a debugger or emulator/simulator and get valid Approov tokens on a specific device by ensuring you are [forcing a device ID to pass](https://approov.io/docs/latest/approov-usage-documentation/#forcing-a-device-id-to-pass). As a shortcut, you can use the `latest` as discussed so that the `device ID` doesn't need to be extracted from the logs or an Approov token.
 * Also, you can use a debugger or Android emulator and get valid Approov tokens on any device if you [mark the signing certificate as being for development](https://approov.io/docs/latest/approov-usage-documentation/#development-app-signing-certificates).
+
 ## SHAPES APP WITH SECRETS PROTECTION
 
 This section provides an illustration of an alternative option for Approov protection if you are not able to modify the backend to add an Approov Token check. 
@@ -196,11 +195,12 @@ Firstly, revert any previous change to `shapesURL` to using `https://shapes.appr
 
 ```C#
 /* The Shapes URL */
-static string endpointVersion = "v1";
-string shapes_api_key = "shapes_api_key_placeholder";
+static string apiVersion = "v1";
 ....
+// *** UNCOMMENT THE LINE BELOW FOR APPROOV USING SECRETS PROTECTION ***
 ApproovService.AddSubstitutionHeader("Api-Key", null);
-ApproovService.DefaultRequestHeaders.Add("Api-Key", shapes_api_key);
+// Add the Api-Key header with the corresponding value
+ApproovService.DefaultRequestHeaders.Add("Api-Key", "shapes_api_key_placeholder");
 ```
 
 You must inform Approov that it should map `shapes_api_key_placeholder` to `yXClypapWNHIifHUWmBIyPFAm` (the actual API key) in requests as follows:
