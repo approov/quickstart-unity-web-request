@@ -601,41 +601,28 @@ NSString* getCertPinForPinType(NSData* certData, NSString* pinningType) {
 
 }
 
-/*  Check if the Approov SDK contains the pin pKey for host pHost
+/* Check if the Approov SDK contains the pin pKey for host pHost
 *  @param pHost: the host to check
-*  @param pKey: the public key to check
-*  @param pKeyType: the type of the pin
+*  @param pKey: the pin to check
+*  @param pinsForHost: list of pins for the host
 *  @return true if the pin is in the Approov SDK, false otherwise
 */
-BOOL checkPinForHostIsSetInApproov(NSString* pHost, NSString* pKey, NSString* pKeyType) {
-    // Get the pins for the host defined in Approov: Note at this point the SDK is already initialized
-    NSDictionary<NSString *, NSArray<NSString *> *> *approovPins = [Approov getPins:pKeyType];
-    if (approovPins == nil) {
-        NSLog(@"ApproovBridge: Unable to get pins from Approov SDK");
-        return false;
-    }
-    // Check if hostname is in the keys of the dictionary
-    if (![approovPins objectForKey:pHost]) {
-        NSLog(@"Host %@ not found in Approov SDK pins", pHost);
-        return NO;
-    }
-
+BOOL checkPinForHostIsSetInApproov(NSString* pHost, NSString* pKey, NSArray<NSString*>* pinsForHost) {
     // Check if the pin is in the list of pins for the host
-    NSArray<NSString *> *pins = [approovPins objectForKey:pHost];
-    if (pins == nil || pins.count == 0) { // We should not have a nil value but an empty one can happen
+    if (pinsForHost == nil || pinsForHost.count == 0) { // We should not have a nil value but an empty one can happen
         NSLog(@"Pins for host %@ are null or empty", pHost);
         return NO;
     }
     
     // Iterate over the pins and check if the pin is in the list
-    for (NSString *pin in pins) {
+    for (NSString *pin in pinsForHost) {
         if ([pin isEqualToString:pKey]) {
             NSLog(@"Pin %@ found in Approov SDK pins for host %@", pKey, pHost);
             return YES;
         }
     }
-    
-    // Default to quiet compiler
+    NSLog(@"NO pins found in Approov SDK pins for host %@", pHost);
+    // Default
     return NO;
 }
 
@@ -706,6 +693,21 @@ NSArray<NSData *> *fetchCertificatesForHost(NSString* hostname) {
     return handler.certificates;
 }
 
+/**
+* Get the list of pins for a given hostname from the Approov SDK
+* @param hostname the hostname to get the pins for
+* @param pinType the type of pin to get
+* @return the list of pins for the hostname or null if the pins are not found
+*/
+NSArray<NSString*>* getPinsForHostFromApproov(NSString* hostname, NSString* pinType) {
+    NSDictionary<NSString *, NSArray<NSString *> *> *approovPins = [Approov getPins:pinType];
+    if (approovPins == nil) {
+        NSLog(@"ApproovBridge: Unable to get pins from Approov SDK");
+        return nil;
+    }
+    return [approovPins objectForKey:hostname];
+}
+
 /* Iterates over certificate chain and attempts to match pins to the ones in the Approov SDK
 * @param hostCertificates: the certificate chain to validate
 * @param hostname: the hostname of the server
@@ -714,21 +716,12 @@ NSArray<NSData *> *fetchCertificatesForHost(NSString* hostname) {
 */
 NSString* approovPinsValidation(NSArray<NSData*>* hostCertificates, NSString* hostname, NSString* pinType) {
     // 1. Get the approov pins for the host
-    NSLog(@"pinType: %@", pinType);
-    NSDictionary<NSString *, NSArray<NSString *> *> *approovPins = [Approov getPins:pinType];
-    if (approovPins == nil) {
-        NSString *errorMessage = [NSString stringWithFormat:@"%@Approov SDK pins are null", TAG];
-        NSLog(@"%@", errorMessage);
-        return errorMessage;
-    }
-    NSLog(@"approovPins: %@", approovPins);
-    // The list of pins for current host
-    NSArray<NSString *> *allPinsForHost = [approovPins objectForKey:hostname];
+    NSArray<NSString *> *allPinsForHost = getPinsForHostFromApproov(hostname, pinType);
     NSLog(@"allPinsForHost: %@", allPinsForHost);
     // if there are no pins for the domain (but the host is present) then use any managed trust roots instead
     if ((allPinsForHost != nil) && (allPinsForHost.count == 0)) {
         // Get the wildcard pins for managed trust roots
-        allPinsForHost = [approovPins objectForKey:@"*"];
+        allPinsForHost = getPinsForHostFromApproov(@"*", pinType);
     }
     // if we are not pinning then we consider this level of trust to be acceptable
     if ((allPinsForHost == nil) || (allPinsForHost.count == 0)) {
@@ -747,7 +740,7 @@ NSString* approovPinsValidation(NSArray<NSData*>* hostCertificates, NSString* ho
             NSLog(@"%@", errorMessage);
             return errorMessage;
         }
-        if (checkPinForHostIsSetInApproov(hostname, evaluatedPin,pinType)) {
+        if (checkPinForHostIsSetInApproov(hostname, evaluatedPin, allPinsForHost)) {
             NSLog(@"%@%@ Matched pin %@ from %lu pins for pin type: %@", TAG, hostname, evaluatedPin, (unsigned long)[allPinsForHost count], pinType);
             return nil;
         }
@@ -789,7 +782,7 @@ char* Approov_shouldProceedWithConnection(Byte* cert, int certLength, char* host
         return (char*)errorMessage;
     }
     // Check if the pinning string is in the set of pins present in Approov
-    if (checkPinForHostIsSetInApproov(hostnameString, pinningString, pinningStringType)) {
+    if (checkPinForHostIsSetInApproov(hostnameString, pinningString, getPinsForHostFromApproov(hostnameString, pinningStringType))) {
         NSString* message = [@"ApproovBridge: Leaf cert pin, connection allowed for host " stringByAppendingString: hostnameString];
         NSLog(@"%@", message);
         return (char*)[SUCCESS UTF8String];
@@ -851,4 +844,3 @@ char* Approov_shouldProceedWithConnection(Byte* cert, int certLength, char* host
     NSLog(@"ApproovBridge: error message during pinning: %@", resultMessage);
     return (char*)[resultMessage UTF8String];
 }
-
