@@ -91,7 +91,7 @@ public class ApproovUnity {
         // Check if the pinning string is in the set of pins present in Approov:
         // We do this step early ONLY to allow the connection to proceed even if the cert is invalid/self-signed/etc
         // since is common to use this option during testing! It will only work if the HOSTNAME is set as protected by Approov
-        if (checkPinForHostIsSetInApproov(hostname, pinningString, pinType, false)) {
+        if (checkPinForHostIsSetInApproov(hostname, pinningString, getPinsForHost(hostname, pinType))) {
             // Perhaps change to "pinned to leaf cert". Is this going to be annoying in the logs?
             System.out.println(TAG + "Leaf cert pin, connection allowed for host " + hostname);
             return SUCCESS;
@@ -155,27 +155,17 @@ public class ApproovUnity {
      * @return null if the connection is pinned by approov or is not protected by Approov, an error message otherwise
     */
     private static String approovPinsValidation(List<byte[]> hostCertificates, String hostname, String pinType) {
-        // Get the approov pins for the host
-        Map<String, List<String>> approovPins = Approov.getPins(pinType);
-        if (approovPins == null) {
-            String errorMessage = TAG + "Approov SDK pins are null";
-            System.out.println(errorMessage);
-            return errorMessage;
-        }
         // Only check the intermediate and root certificates because we know the pin is not to the leaf cert
         int startIndex = 1;
         // The list of pins for current host
-        List<String> allPinsForHost = approovPins.get(hostname);
-        // Is this a managed trust root?
-        boolean isManagedTrustRoot = false;
+        List<String> allPinsForHost = getPinsForHost(hostname, pinType);
         // if there are no pins for the domain (but the host is present) then use any managed trust roots instead
         if ((allPinsForHost != null) && (allPinsForHost.size() == 0))
         {
             // Get the wildcard pins for managed trust roots
-            allPinsForHost = approovPins.get("*");
+            allPinsForHost = getPinsForHost("*", pinType);
             // managed trust roots only ever pin to the root certificate
             startIndex = hostCertificates.size() - 1;
-            isManagedTrustRoot = true;
         }
         // if we are not pinning then we consider this level of trust to be acceptable
         if ((allPinsForHost == null) || (allPinsForHost.size() == 0))
@@ -194,7 +184,7 @@ public class ApproovUnity {
                 System.out.println(errorMessage);
                 return errorMessage;
             }
-            if (checkPinForHostIsSetInApproov(hostname, evaluatedPin, pinType, isManagedTrustRoot)) {
+            if (checkPinForHostIsSetInApproov(hostname, evaluatedPin, allPinsForHost)) {
                 System.out.println(TAG + "Intermediate/root cert pin, connection allowed for host " + hostname);
                 return null;
             }
@@ -265,33 +255,12 @@ public class ApproovUnity {
      * 
      * @param host the host to check
      * @param targetPin the pin to check
-     * @param pinType the type of the public key
-     * @param isManagedTrustRoot true if the host is a managed trust root, false otherwise
+     * @param pinsForHost list of pins for the host
      * @return true if the pin is in the Approov SDK, false otherwise
      */
-    private static boolean checkPinForHostIsSetInApproov(String host, String targetPin, String pinType, boolean isManagedTrustRoot) {
-        // Get the pins for the host defined in Approov: Note at this point the SDK is already initialized
-        Map<String, List<String>> approovPins = Approov.getPins(pinType);
-        if (approovPins == null) {
-            System.out.println(TAG + "No defined Approov pins");
-            return false;
-        }
-        // We query the dictionary with defined host:List<pins> and get the list of pins for the host
-        List<String> pinsForHost = null;
-        // If we have Managed Trust Roots enabled then we need to check the wildcard entry
-        if(isManagedTrustRoot) {
-            // Get the wildcard pins for Managed Trust Roots
-            pinsForHost = approovPins.get("*");
-        } else if (approovPins.containsKey(host)) {
-            // We are NOT using Managed Trust Roots and there is an entry for the host
-            pinsForHost = approovPins.get(host);
-        } else {
-            // We are NOT using Managed Trust Roots and there is no entry for the host
-            System.out.println(TAG + "No pins found for host " + host);
-            return false;
-        }
+    private static boolean checkPinForHostIsSetInApproov(String host, String targetPin, List<String> pinsForHost) {
         // Check if the pin is in the list of pins for the host
-        if ((pinsForHost == null) || (pinsForHost.size() == 0)) { // We should not have a null value but an empty one can happen
+        if ((pinsForHost == null) || (pinsForHost.size() == 0)) {
             System.out.println(TAG + "Pin set is empty for host " + host);
             return false;
         }
@@ -357,5 +326,19 @@ public class ApproovUnity {
         } finally {
             certCacheLock.writeLock().unlock();
         }
+    }
+
+    /**
+     * Get the list of pins for a given hostname from the Approov SDK
+     * @param hostname the hostname to get the pins for
+     * @param pinType the type of pin to get
+     * @return the list of pins for the hostname or null if the pins are not found
+     */
+    public static List<String> getPinsForHost(String hostname, String pinType) {
+        Map<String,List<String>> allPins = Approov.getPins(pinType);
+        if(allPins == null) {
+            return null;
+        }
+        return allPins.get(hostname);
     }
 }
