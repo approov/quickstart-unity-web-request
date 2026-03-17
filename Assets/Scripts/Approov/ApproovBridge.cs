@@ -273,7 +273,7 @@ namespace Approov {
 
         // + (nullable NSData *)getIntegrityMeasurementProof:(nonnull NSData *)nonce :(nonnull NSData *)measurementConfig;
         [DllImport("__Internal")]
-        private static extern IntPtr Approov_getIntegrityMeasurementProof(byte[] nonce, int nonceLength, byte[] measurementConfig, int measurementConfigLength);
+        private static extern IntPtr Approov_getIntegrityMeasurementProof(byte[] nonce, int nonceLength, byte[] measurementConfig, int measurementConfigLength, out int resultLength);
 
         public static byte[] GetIntegrityMeasurementProof(byte[] nonce, byte[] measurementConfig)
         {
@@ -282,14 +282,13 @@ namespace Approov {
                 return null;
             }
             // Call the native function and get the pointer to the result
-            IntPtr resultPtr = Approov_getIntegrityMeasurementProof(nonce, nonce.Length, measurementConfig, measurementConfig.Length);
-            if (resultPtr == IntPtr.Zero)
+            IntPtr resultPtr = Approov_getIntegrityMeasurementProof(nonce, nonce.Length, measurementConfig, measurementConfig.Length, out int resultLength);
+            if (resultPtr == IntPtr.Zero || resultLength <= 0)
             {
                 return null;
             }
-            // Marshal the pointer to the result structure
-            byte[] result = new byte[Marshal.SizeOf(resultPtr)];
-            Marshal.Copy(resultPtr, result, 0, result.Length);
+            byte[] result = new byte[resultLength];
+            Marshal.Copy(resultPtr, result, 0, resultLength);
 
             // Free the unmanaged memory allocated by the Objective-C function
             // Note: This step is necessary to prevent memory leaks
@@ -300,7 +299,7 @@ namespace Approov {
 
         // + (nullable NSData *)getDeviceMeasurementProof:(nonnull NSData *)nonce :(nonnull NSData *)measurementConfig;
         [DllImport("__Internal")] 
-        private static extern IntPtr Approov_getDeviceMeasurementProof(byte[] nonce, int nonceLength, byte[] measurementConfig, int measurementConfigLength);
+        private static extern IntPtr Approov_getDeviceMeasurementProof(byte[] nonce, int nonceLength, byte[] measurementConfig, int measurementConfigLength, out int resultLength);
 
         public static byte[] GetDeviceMeasurementProof(byte[] nonce, byte[] measurementConfig)
         {
@@ -309,14 +308,13 @@ namespace Approov {
                 return null;
             }
             // Call the native function and get the pointer to the result
-            IntPtr resultPtr = Approov_getDeviceMeasurementProof(nonce, nonce.Length, measurementConfig, measurementConfig.Length);
-            if (resultPtr == IntPtr.Zero)
+            IntPtr resultPtr = Approov_getDeviceMeasurementProof(nonce, nonce.Length, measurementConfig, measurementConfig.Length, out int resultLength);
+            if (resultPtr == IntPtr.Zero || resultLength <= 0)
             {
                 return null;
             }
-            // Marshal the pointer to the result structure
-            byte[] result = new byte[Marshal.SizeOf(resultPtr)];
-            Marshal.Copy(resultPtr, result, 0, result.Length);
+            byte[] result = new byte[resultLength];
+            Marshal.Copy(resultPtr, result, 0, resultLength);
 
             // Free the unmanaged memory allocated by the Objective-C function
             // Note: This step is necessary to prevent memory leaks
@@ -398,10 +396,11 @@ namespace Approov {
             string result = Marshal.PtrToStringAuto(resultPtr);
             if(result == SUCCESS) {
                 // "SUCCESS" is returned if the connection is allowed and there was no error in native interface calls
+                Marshal.FreeHGlobal(resultPtr);
                 return null;
             }
             // Free the unmanaged memory allocated by the Objective-C function
-            //Marshal.FreeHGlobal(resultPtr);
+            Marshal.FreeHGlobal(resultPtr);
             return result;
         }
 #elif UNITY_ANDROID

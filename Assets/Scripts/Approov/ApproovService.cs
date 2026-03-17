@@ -293,6 +293,13 @@ namespace Approov
                     {
                         try {
                             Regex reg = new Regex(urlRegex);
+                            foreach (Regex existing in ExclusionURLRegexs)
+                            {
+                                if (existing.ToString() == urlRegex)
+                                {
+                                    return;
+                                }
+                            }
                             ExclusionURLRegexs.Add(reg);
                             Console.WriteLine(TAG + "AddExclusionURLRegex " + urlRegex);
                         } catch (ArgumentException e) {
@@ -317,8 +324,19 @@ namespace Approov
                     if (urlRegex != null)
                     {
                         try {
-                            Regex reg = new Regex(urlRegex);
-                            ExclusionURLRegexs.Remove(reg);
+                            Regex regexToRemove = null;
+                            foreach (Regex existing in ExclusionURLRegexs)
+                            {
+                                if (existing.ToString() == urlRegex)
+                                {
+                                    regexToRemove = existing;
+                                    break;
+                                }
+                            }
+                            if (regexToRemove != null)
+                            {
+                                ExclusionURLRegexs.Remove(regexToRemove);
+                            }
                             Console.WriteLine(TAG + "RemoveExclusionURLRegex " + urlRegex);
                         } catch (ArgumentException e) {
                             Console.WriteLine(TAG + "RemoveExclusionURLRegex: " + e.Message);
@@ -555,7 +573,7 @@ namespace Approov
                 throw new NetworkingErrorException(TAG + "FetchSecureString: network issue, retry needed");
 
             }
-            else if ((fetchStatus!= (int)ApproovTokenFetchStatus.Success) &&
+            else if ((fetchStatus != ApproovTokenFetchStatus.Success) &&
                     fetchStatus!= ApproovTokenFetchStatus.UnknownKey)
             {
                 // we have failed to get a secure string with a more serious permanent error

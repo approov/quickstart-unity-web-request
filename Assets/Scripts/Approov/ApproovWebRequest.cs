@@ -90,9 +90,56 @@ namespace Approov {
         public new UnityWebRequestAsyncOperation SendWebRequest() {
             // Modify the request headers
             UpdateRequestHeadersWithApproov();
-            // New download handler
-            this.downloadHandler = new DownloadHandlerBuffer();
+            // Preserve any caller-provided handler and only provide the Unity default when none exists.
+            if (this.downloadHandler == null)
+            {
+                this.downloadHandler = new DownloadHandlerBuffer();
+            }
             return base.SendWebRequest();
+        }
+
+        private string SubstituteQueryParameter(string requestUrl, string queryParamKey)
+        {
+            string pattern = "([?&]" + Regex.Escape(queryParamKey) + "=)([^&#]*)";
+            Regex regex = new Regex(pattern, RegexOptions.ECMAScript);
+            return regex.Replace(requestUrl, match =>
+            {
+                string matchedText = match.Groups[2].Value;
+                ApproovTokenFetchResult secStringResult = ApproovBridge.FetchSecureStringAndWait(matchedText, null);
+                ApproovTokenFetchStatus fetchStatus = secStringResult.status;
+
+                if (fetchStatus == ApproovTokenFetchStatus.Success)
+                {
+                    string secureString = secStringResult.secureString;
+                    if (secureString == null)
+                    {
+                        throw new ApproovException(TAG + "UpdateRequestHeadersWithApproov null return from query parameter secure string fetch");
+                    }
+                    return match.Groups[1].Value + secureString;
+                }
+                else if (fetchStatus == ApproovTokenFetchStatus.Rejected)
+                {
+                    throw new RejectionException(
+                        TAG + "UpdateRequestHeadersWithApproov secure message rejected",
+                        arc: secStringResult.ARC,
+                        rejectionReasons: secStringResult.rejectionReasons);
+                }
+                else if (fetchStatus == ApproovTokenFetchStatus.NoNetwork ||
+                         fetchStatus == ApproovTokenFetchStatus.PoorNetwork ||
+                         fetchStatus == ApproovTokenFetchStatus.MITMDetected)
+                {
+                    if (!ApproovService.GetProceedOnNetworkFailure())
+                    {
+                        throw new NetworkingErrorException(TAG + "Query parameter substitution: network issue, retry needed");
+                    }
+                }
+                else if (fetchStatus != ApproovTokenFetchStatus.UnknownKey)
+                {
+                    throw new PermanentException(TAG + "Query parameter substitution error: " + ApproovService.ApproovTokenFetchStatusToString(fetchStatus));
+                }
+
+                return match.Value;
+            });
         }
 
         // MARK: Regexp/Query param methods
@@ -120,9 +167,9 @@ namespace Approov {
             Uri uri = new Uri(urlWithBaseAddress);
             string hostname = uri.Host;
             // Check if the URL matches one of the exclusion regexs and just return if it does
-            if (ApproovService.CheckURLIsExcluded(hostname))
+            if (ApproovService.CheckURLIsExcluded(urlWithBaseAddress))
             {
-                Console.WriteLine(TAG + "UpdateRequestHeadersWithApproov excluded url " + hostname);
+                Console.WriteLine(TAG + "UpdateRequestHeadersWithApproov excluded url " + urlWithBaseAddress);
                 return;
             }
             string bindingHeader = ApproovService.GetBindingHeader();
@@ -288,62 +335,19 @@ namespace Approov {
             string urlString = urlWithBaseAddress;
             foreach (string entry in originalQueryParams)
             {
-                string pattern = entry;
+                string pattern = "([?&]" + Regex.Escape(entry) + "=)([^&#]*)";
                 Regex regex = new Regex(pattern, RegexOptions.ECMAScript);
-                // See if there is any match
-                MatchCollection matchedPatterns = regex.Matches(urlString);
-                // We skip Group at index 0 as this is the match (e.g. ?Api-Key=api_key_placeholder) for the whole
-                // regex, but we only want to replace the query parameter value part (e.g. api_key_placeholder)
-                for (int count = 0; count < matchedPatterns.Count; count++)
+                if (regex.IsMatch(urlString))
                 {
-                    // We must have 2 Groups, the first being the full pattern and the second one the query parameter
-                    if (matchedPatterns[count].Groups.Count != 2) continue;
-                    string matchedText = matchedPatterns[count].Groups[1].Value;
-                    // We fetch a secure string again, which should just return the old one from the cache
-                    ApproovTokenFetchResult secStringResult = ApproovBridge.FetchSecureStringAndWait(matchedText, null);
-                    ApproovTokenFetchStatus fetchStatus = secStringResult.status;
-
-                    // Check the status
-                    if (fetchStatus == ApproovTokenFetchStatus.Success)
-                    {
-                        // we successfully obtained a secure string so replace the query parameter value
-                        // Call getSecureString() method on fetch result
-                        String secureString = secStringResult.secureString;
-                        // Replace the ocureences and modify the URL
-                        string newURL = urlString.Replace(matchedText, secureString);
-                        // we log
-                        Console.WriteLine(TAG + "replacing url with " + newURL);
-                        this.uri = new Uri(newURL);
-                    }
-                    else if (fetchStatus == ApproovTokenFetchStatus.Rejected)
-                    {
-                        // if the request is rejected then we provide a special exception with additional information
-                        string localARC = secStringResult.ARC;
-                        string localReasons = secStringResult.rejectionReasons;
-                        throw new RejectionException(TAG + "UpdateRequestHeadersWithApproov secure message rejected", arc: localARC, rejectionReasons: localReasons);
-                    }
-                    else if (fetchStatus == ApproovTokenFetchStatus.NoNetwork ||
-                            fetchStatus == ApproovTokenFetchStatus.PoorNetwork ||
-                            fetchStatus == ApproovTokenFetchStatus.MITMDetected)
-                    {
-                        /* We are unable to get the secure string due to network conditions so the request can
-                        *  be retried by the user later
-                        *  We are unable to get the secure string due to network conditions, so - unless this is
-                        *  overridden - we must not proceed. The request can be retried by the user later.
-                        */
-                        if (!ApproovService.GetProceedOnNetworkFailure())
-                        {
-                            // We throw
-                            throw new NetworkingErrorException(TAG + "Query parameter substitution: network issue, retry needed");
-                        }
-                    }
-                    else if (fetchStatus != ApproovTokenFetchStatus.UnknownKey)
-                    {
-                        // we have failed to get a secure string with a more serious permanent error
-                        throw new PermanentException(TAG + "Query parameter substitution error: " + ApproovService.ApproovTokenFetchStatusToString(fetchStatus));
-                    }
+                    string newURL = SubstituteQueryParameter(urlString, entry);
+                    Console.WriteLine(TAG + "replacing url with " + newURL);
+                    urlString = newURL;
                 }
             }// foreach
+            if (urlString != urlWithBaseAddress)
+            {
+                this.uri = new Uri(urlString);
+            }
         }//UpdateRequestHeadersWithApproov
     }// ApproovWebRequest class
 }// namespace Approov

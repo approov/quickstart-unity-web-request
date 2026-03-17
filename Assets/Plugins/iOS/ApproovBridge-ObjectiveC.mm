@@ -19,6 +19,26 @@ static const NSTimeInterval FETCH_CERTIFICATES_TIMEOUT = 3;
 
 @end
 
+static char* copyCStringBytes(const void *bytes, size_t length) {
+    char *buffer = (char *)malloc(length);
+    if (buffer == NULL) {
+        return NULL;
+    }
+    memcpy(buffer, bytes, length);
+    return buffer;
+}
+
+static char* copyNSString(NSString *value) {
+    if (value == nil) {
+        return NULL;
+    }
+    const char *cString = [value UTF8String];
+    if (cString == NULL) {
+        return NULL;
+    }
+    return copyCStringBytes(cString, strlen(cString) + 1);
+}
+
 @implementation CertificateHandler
 
 - (instancetype)init {
@@ -370,49 +390,47 @@ void Approov_setDataHashInToken(char* data) {
 
 // NOTE in objectiveC: typedef unsigned char Byte;
 extern "C" {
-    char* Approov_getIntegrityMeasurementProof(Byte* nonce, int nonceLength, Byte* measurementConfig, int measurementConfigLength);
+    char* Approov_getIntegrityMeasurementProof(Byte* nonce, int nonceLength, Byte* measurementConfig, int measurementConfigLength, int *resultLength);
 }
 
-char* Approov_getIntegrityMeasurementProof(Byte* nonce, int nonceLength, Byte* measurementConfig, int measurementConfigLength) {
+char* Approov_getIntegrityMeasurementProof(Byte* nonce, int nonceLength, Byte* measurementConfig, int measurementConfigLength, int *resultLength) {
     // Convert to NSData
     NSData *nonceData = [NSData dataWithBytes:nonce length:nonceLength];
     NSData *configData = [NSData dataWithBytes:measurementConfig length:measurementConfigLength];
     // Call the getIntegrityMeasurementProof method
     NSData *resultData = [Approov getIntegrityMeasurementProof:nonceData :configData];
+    if (resultLength != NULL) {
+        *resultLength = 0;
+    }
     if (resultData == nil) {
         return NULL;
     }
-    const char* resultCString = (const char*)[resultData bytes];
-    // Create a copy of the string to return
-    char* aStringCopy = (char*)malloc(resultData.length + 1);
-    if (aStringCopy == NULL) {
-        return NULL;
+    if (resultLength != NULL) {
+        *resultLength = (int)resultData.length;
     }
-    memcpy(aStringCopy, resultCString, strlen(resultCString) + 1);
-    return aStringCopy;
+    return copyCStringBytes([resultData bytes], resultData.length);
 }
 
 extern "C" {
-    char* Approov_getDeviceMeasurementProof(Byte* nonce, int nonceLength, Byte* measurementConfig, int measurementConfigLength);
+    char* Approov_getDeviceMeasurementProof(Byte* nonce, int nonceLength, Byte* measurementConfig, int measurementConfigLength, int *resultLength);
 }
 
-char* Approov_getDeviceMeasurementProof(Byte* nonce, int nonceLength, Byte* measurementConfig, int measurementConfigLength) {
+char* Approov_getDeviceMeasurementProof(Byte* nonce, int nonceLength, Byte* measurementConfig, int measurementConfigLength, int *resultLength) {
     // Convert to NSData
     NSData *nonceData = [NSData dataWithBytes:nonce length:nonceLength];
     NSData *configData = [NSData dataWithBytes:measurementConfig length:measurementConfigLength];
     // Call the getDeviceMeasurementProof method
     NSData *resultData = [Approov getDeviceMeasurementProof:nonceData :configData];
+    if (resultLength != NULL) {
+        *resultLength = 0;
+    }
     if (resultData == nil) {
         return NULL;
     }
-    const char* resultCString = (const char*)[resultData bytes];
-    // Create a copy of the string to return
-    char* aStringCopy = (char*)malloc(resultData.length + 1);
-    if (aStringCopy == NULL) {
-        return NULL;
+    if (resultLength != NULL) {
+        *resultLength = (int)resultData.length;
     }
-    memcpy(aStringCopy, resultCString, strlen(resultCString) + 1);
-    return aStringCopy;
+    return copyCStringBytes([resultData bytes], resultData.length);
 }
 
 
@@ -768,8 +786,7 @@ extern "C" {
 char* Approov_shouldProceedWithConnection(Byte* cert, int certLength, char* hostname, int hostnameLength,
                                                     char* pinType, int pinTypeLength) {
     if (hostname == NULL || pinType == NULL) {
-        const char* errorMessage = "Hostname or pinning type can not be null";
-        return (char*)errorMessage;
+        return copyNSString(@"Hostname or pinning type can not be null");
     }
     // Get the pinning information from the certificate
     NSString* hostnameString = [[NSString alloc] initWithBytes:hostname length:hostnameLength encoding:NSUTF8StringEncoding];
@@ -778,24 +795,23 @@ char* Approov_shouldProceedWithConnection(Byte* cert, int certLength, char* host
     NSString* pinningString = getCertPinForPinType(certData, pinningStringType);
 
     if (pinningString == nil) {
-        const char* errorMessage = "ApproovBridge: Unable to extract pinning information from certificate";
-        return (char*)errorMessage;
+        return copyNSString(@"ApproovBridge: Unable to extract pinning information from certificate");
     }
     // Check if the pinning string is in the set of pins present in Approov
     if (checkPinForHostIsSetInApproov(hostnameString, pinningString, getPinsForHostFromApproov(hostnameString, pinningStringType))) {
         NSString* message = [@"ApproovBridge: Leaf cert pin, connection allowed for host " stringByAppendingString: hostnameString];
         NSLog(@"%@", message);
-        return (char*)[SUCCESS UTF8String];
+        return copyNSString(SUCCESS);
     }
 
     // The pinning info from leaf certificate is not in the Approov SDK, so we query the cache
     NSData* cachedLeafCertData = retrieveFromGlobalCacheDictionary(hostnameString);
     if(cachedLeafCertData) {
         // Compare the leaf cert to current one
-        if (cachedLeafCertData == certData) {
+        if ([cachedLeafCertData isEqualToData:certData]) {
             NSString* message = [@"ApproovBridge: Cached cert match, connection allowed for host " stringByAppendingString: hostnameString];
             NSLog(@"%@", message);
-            return (char*)[SUCCESS UTF8String];
+            return copyNSString(SUCCESS);
         } else {
             /* The leaf certificate is NOT present in cache: We DELETE the cached entry for host */
             NSLog(@"%@", [NSString stringWithUTF8String:"ApproovBridge: Leaf certificate hash found in cache, but does not match the one fetched from host"]);
@@ -811,24 +827,24 @@ char* Approov_shouldProceedWithConnection(Byte* cert, int certLength, char* host
     if (certificates == nil) {
         NSString* message = [@"ApproovBridge: Failed to get certificates for host " stringByAppendingString: hostnameString];
         NSLog(@"%@", message);
-        return (char*)[message UTF8String];
+        return copyNSString(message);
     } else if (certificates.count == 0) {
         NSString* message = [@"ApproovBridge: Certificate chain verification failed for host: " stringByAppendingString: hostnameString];
         NSLog(@"%@", message);
-        return (char*)[message UTF8String];
+        return copyNSString(message);
     }
     // We need to have a leaf cert and at least one intermediate/root cert because we have already checked the leaf.
     if ([certificates count] < 2) {
         NSString* message = [@"ApproovBridge: Certificate chain too small for host " stringByAppendingString: hostnameString];
         NSLog(@"%@", message);
-        return (char*)[message UTF8String];
+        return copyNSString(message);
     }
     // Check if the leaf certificate obtained matches the input certificate
     NSData* leafCertData = certificates[0];
     if (![leafCertData isEqualToData:certData]) {
         NSString* message = [@"ApproovBridge: Leaf certificate hash does not match the one fetched from host " stringByAppendingString: hostnameString];
         NSLog(@"%@", message);
-        return (char*)[message UTF8String];
+        return copyNSString(message);
     }
 
     // Check pinning status
@@ -838,9 +854,9 @@ char* Approov_shouldProceedWithConnection(Byte* cert, int certLength, char* host
         // Add the chain to cache
         //void addToGlobalCache(NSString* key,NSString* value)
         addToGlobalCache(hostnameString, [certificates objectAtIndex:0]);
-        return (char*)[SUCCESS UTF8String];
+        return copyNSString(SUCCESS);
     }
     // We return the error message to C# land
     NSLog(@"ApproovBridge: error message during pinning: %@", resultMessage);
-    return (char*)[resultMessage UTF8String];
+    return copyNSString(resultMessage);
 }
