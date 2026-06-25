@@ -1,3 +1,5 @@
+> **⚠️ Note:** This quickstart has been deprecated. Please use **[approov-service-unity](https://github.com/approov/approov-service-unity.git)** instead, which has been significantly improved and is the recommended integration.
+
 # Approov Quickstart: UnityWebRequest
 
 This quickstart is written specifically for Android and iOS apps that are written in C# and use [`UnityWebRequest`](https://docs.unity3d.com/ScriptReference/Networking.UnityWebRequest.html) for making the API calls that you wish to protect with Approov. If this is not your situation then check if there is a more relevant quickstart guide available.
